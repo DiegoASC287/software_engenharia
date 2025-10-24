@@ -47,7 +47,9 @@ export enum TipoEstaca {
   METALICA = "Metálica",
   PRE_MOLDADA = "Pré-moldada",
   ESCAVADA = "Escavada",
-  RAIZ_HELICE_OMEGA = "Raiz, Hélice contínua e Ômega",
+  RAIZ_HELICE_OMEGA = "Raiz",
+  HELICE_CONTINUJA = "Hélice contínua",
+  OMEGA = "Omega",
 }
 
 // Tipo representando os fatores F1 e F2
@@ -59,6 +61,10 @@ export function fatoresCorrecaoAoki(tipo: TipoEstaca, diametro: number){
         [TipoEstaca.PRE_MOLDADA]: { F1: 1+diametro*0.8, F2: 2*(1+diametro*0.8) },
         [TipoEstaca.ESCAVADA]: { F1: 3.00, F2: 6 },
         [TipoEstaca.RAIZ_HELICE_OMEGA]: { F1: 2.00, F2: 4 },
+        [TipoEstaca.HELICE_CONTINUJA]: { F1: 2.00, F2: 4 },
+        [TipoEstaca.OMEGA]: { F1: 2.00, F2: 4 },
     }
     return tipos[tipo]
 }
+
+export function calculaCapacidadeCargaEstacaAoki(){}
