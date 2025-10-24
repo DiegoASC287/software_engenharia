@@ -20,21 +20,21 @@ export enum TipoDeSolo {
 // Tipo representando as propriedades de cada solo
 export function ParamsTipoSoloAoki(solo: TipoDeSolo){
     const tipos: Record<TipoDeSolo, { K: number, alfa: number }> = {
-        [TipoDeSolo.AREIA]: { K: 1.00, alfa: 1.4 },
-        [TipoDeSolo.AREIA_SILTOSA]: { K: 0.80, alfa: 2.0 },
+        [TipoDeSolo.AREIA]: { K: 1.00*1000, alfa: 1.4 },
+        [TipoDeSolo.AREIA_SILTOSA]: { K: 0.80*1000, alfa: 2.0 },
         [TipoDeSolo.AREIA_SILTOARGILOSA]: { K: 0.70, alfa: 2.4 },
-        [TipoDeSolo.AREIA_ARGILOSA]: { K: 0.60, alfa: 3.0 },
-        [TipoDeSolo.AREIA_ARGILOSSILTOSA]: { K: 0.50, alfa: 2.8 },
-        [TipoDeSolo.SILTE]: { K: 0.40, alfa: 3.0 },
-        [TipoDeSolo.SILTE_ARENOSO]: { K: 0.55, alfa: 2.2 },
-        [TipoDeSolo.SILTE_ARENOARGILOSO]: { K: 0.45, alfa: 2.8 },
-        [TipoDeSolo.SILTE_ARGILOSO]: { K: 0.23, alfa: 3.4 },
-        [TipoDeSolo.SILTE_ARGILOARENOSO]: { K: 0.25, alfa: 3.0 },
-        [TipoDeSolo.ARGILA]: { K: 0.20, alfa: 6.0 },
-        [TipoDeSolo.ARGILA_ARENOSA]: { K: 0.35, alfa: 2.4 },
-        [TipoDeSolo.ARGILA_ARENOSSILTOSA]: { K: 0.30, alfa: 2.8 },
-        [TipoDeSolo.ARGILA_SILTOSA]: { K: 0.22, alfa: 4.0 },
-        [TipoDeSolo.ARGILA_SILTOARENOSA]: { K: 0.33, alfa: 3.0 },
+        [TipoDeSolo.AREIA_ARGILOSA]: { K: 0.60*1000, alfa: 3.0 },
+        [TipoDeSolo.AREIA_ARGILOSSILTOSA]: { K: 0.50*1000, alfa: 2.8 },
+        [TipoDeSolo.SILTE]: { K: 0.40*1000, alfa: 3.0 },
+        [TipoDeSolo.SILTE_ARENOSO]: { K: 0.55*1000, alfa: 2.2 },
+        [TipoDeSolo.SILTE_ARENOARGILOSO]: { K: 0.45*1000, alfa: 2.8 },
+        [TipoDeSolo.SILTE_ARGILOSO]: { K: 0.23*1000, alfa: 3.4 },
+        [TipoDeSolo.SILTE_ARGILOARENOSO]: { K: 0.25*1000, alfa: 3.0 },
+        [TipoDeSolo.ARGILA]: { K: 0.20*1000, alfa: 6.0 },
+        [TipoDeSolo.ARGILA_ARENOSA]: { K: 0.35*1000, alfa: 2.4 },
+        [TipoDeSolo.ARGILA_ARENOSSILTOSA]: { K: 0.30*1000, alfa: 2.8 },
+        [TipoDeSolo.ARGILA_SILTOSA]: { K: 0.22*1000, alfa: 4.0 },
+        [TipoDeSolo.ARGILA_SILTOARENOSA]: { K: 0.33*1000, alfa: 3.0 },
     }
     return tipos[solo]
 }
