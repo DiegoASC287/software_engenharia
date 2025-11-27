@@ -34,11 +34,11 @@ function calcCapAokiVelloso({Nsd, diametro, tipo_estaca,
     // Cálculo da capacidade de carga da estaca segundo Aoki & Velloso (1975)
     const resistecia: ResultadoCalculoEstaca[] = []
     let profundidade_atual = 1;
-    while (profundidade_atual < prof_apoio) {
+    while (profundidade_atual <= prof_apoio) {
         const nspt_cur = spt[profundidade_atual-1];
         const {K, alfa} = ParamsTipoSoloAoki(nspt_cur?.tipo_solo ?? TipoDeSolo.ARGILA);
         console.log(`Profundidade: ${profundidade_atual} m, Tipo Solo: ${nspt_cur?.tipo_solo}, Nspt: ${nspt_cur?.nspt}, K: ${K}, alfa: ${alfa}`);
-        const qs_cur = (alfa*K*(nspt_cur?.nspt ?? 0)*Math.PI*diametro)/F2;
+        const qs_cur = (alfa/100*K*(nspt_cur?.nspt ?? 0)*Math.PI*diametro)/F2;
         let Qp_cur_try = K*(nspt_cur?.nspt ?? 0)*Math.PI*(diametro**2)/(4*F1);
         let Qp_cur = 0;
         const q_acum = resistecia.reduce((acc, cur) => acc + cur.Qs+cur.Qp, 0) 
