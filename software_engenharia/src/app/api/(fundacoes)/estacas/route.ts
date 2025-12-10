@@ -1,10 +1,11 @@
-import { fatoresCorrecaoAoki, ParamsTipoSoloAoki, TipoDeSolo, TipoEstaca } from "@/funcoes_coeficientes/fundacoes/dimensionamento_estacas";
+import { fatoresCorrecaoAoki, ParamsTipoSoloAoki, RetornarValorKhEKv, TipoDeSolo, TipoEstaca } from "@/funcoes_coeficientes/fundacoes/dimensionamento_estacas";
 import { NextRequest, NextResponse } from "next/server";
 import z from "zod";
 const PropsEntradaEstaca = z.object({
     spt: z.array(z.object({
         nspt: z.number().min(0),
-        tipo_solo: z.enum(TipoDeSolo)
+        tipo_solo: z.enum(TipoDeSolo),
+        submerso: z.boolean(),
     })),
     Nsd: z.number().min(0),
     prof_apoio: z.number().min(0),
@@ -23,6 +24,13 @@ interface ResultadoCalculoEstaca {
     Nsd_pp: number;
     Nsd_tot: number;
     profundidade: number;
+    tipo_solo: TipoDeSolo
+    nspt: number
+    K: number
+    F1: number,
+    F2: number,
+    kh: number,
+    kv: number
 }
 
 type IPropsEntradaEstaca = z.infer<typeof PropsEntradaEstaca>;
@@ -36,21 +44,23 @@ function calcCapAokiVelloso({Nsd, diametro, tipo_estaca,
     let profundidade_atual = 1;
     while (profundidade_atual <= prof_apoio) {
         const nspt_cur = spt[profundidade_atual-1];
+        const {kh, kv} = RetornarValorKhEKv({diametro_largura: diametro, ...nspt_cur, profundidade: profundidade_atual})
         const {K, alfa} = ParamsTipoSoloAoki(nspt_cur?.tipo_solo ?? TipoDeSolo.ARGILA);
-        console.log(`Profundidade: ${profundidade_atual} m, Tipo Solo: ${nspt_cur?.tipo_solo}, Nspt: ${nspt_cur?.nspt}, K: ${K}, alfa: ${alfa}`);
+        console.log(`Profundidade: ${profundidade_atual} m, Tipo Solo: ${nspt_cur?.tipo_solo}, Nspt: ${nspt_cur?.nspt}, K: ${K}, alfa: ${alfa}, F1: ${F1}, F2: ${F2}`);
         const qs_cur = (alfa/100*K*(nspt_cur?.nspt ?? 0)*Math.PI*diametro)/F2;
         let Qp_cur_try = K*(nspt_cur?.nspt ?? 0)*Math.PI*(diametro**2)/(4*F1);
         let Qp_cur = 0;
         const q_acum = resistecia.reduce((acc, cur) => acc + cur.Qs+cur.Qp, 0) 
-        if(profundidade_atual === prof_apoio || ((q_acum + qs_cur)/fl+Qp_cur_try/fl >= Nsd)){
+        if(profundidade_atual === prof_apoio || ((q_acum + qs_cur)/fl+Qp_cur_try/fp >= Nsd)){
             Qp_cur = Qp_cur_try
         }
-        const qtot = q_acum+ qs_cur+Qp_cur;
+        const qtot = q_acum+ qs_cur+Qp_cur/fp;
         const qrd = (q_acum+ qs_cur)/fl+Qp_cur/fp;
         const Nsd_pp_cur = Math.PI*(diametro**2)/4*(profundidade_atual)*25*1.4
         const Nsd_tot = Nsd + Nsd_pp_cur;
 
-        resistecia.push({Qs: qs_cur, Qp: Qp_cur, Qacum: qtot, Qrd: qrd, Nsd, Nsd_pp: Nsd_pp_cur, Nsd_tot, profundidade: profundidade_atual});
+        resistecia.push({profundidade: profundidade_atual, tipo_solo: nspt_cur.tipo_solo, nspt: nspt_cur.nspt, F1, F2, K,
+            Qs: qs_cur, Qp: Qp_cur, Qacum: qtot, Qrd: qrd, Nsd, Nsd_pp: Nsd_pp_cur, Nsd_tot, kh, kv});
         if(resistecia.slice(-1)[0].Qrd >= Nsd_tot){
             return resistecia;
         }
