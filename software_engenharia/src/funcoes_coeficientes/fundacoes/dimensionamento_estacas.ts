@@ -49,6 +49,32 @@ export function ParamsTipoSoloAoki(solo: TipoDeSolo) {
 	return tipos[solo]
 }
 
+export function BuscarFatorGrupo(espacamento: number, diametro: number, tipo_estaca: TipoEstaca) {
+	const estacas_escavadas: TipoEstaca[] = [TipoEstaca.ESCAVADA, TipoEstaca.OMEGA,
+	TipoEstaca.FRANKI, TipoEstaca.HELICE_CONTINUJA, TipoEstaca.RAIZ]
+	const estacas_cravadas: TipoEstaca[] = [TipoEstaca.METALICA, TipoEstaca.PRE_MOLDADA]
+
+	if (estacas_escavadas.includes(tipo_estaca)) {
+		if (espacamento / diametro > 4) {
+			return 1
+		} else if (espacamento / diametro >= 3) {
+			return 0.85
+		} else if (espacamento / diametro >= 2.5) {
+			return 0.75
+		} else {
+			return 0.65
+		}
+	}else{
+		if (espacamento / diametro > 3) {
+			return 1
+		} else if (espacamento / diametro >= 2.5) {
+			return 0.95
+		}  else {
+			return 0.65
+		}
+	}
+}
+
 export function ParamsSubtipoSolo(solo: SubTipoSolo, submerso: boolean) {
 	const tipos: Record<SubTipoSolo, { K1: number }> = {
 		[SubTipoSolo.AREIA_FOFA]: { K1: submerso ? 0.1 : 0.2 },
@@ -62,7 +88,7 @@ export function ParamsSubtipoSolo(solo: SubTipoSolo, submerso: boolean) {
 	return tipos[solo]
 }
 
-export function VerificarTipo(tipo: TipoDeSolo, nspt: number): {subtipo: SubTipoSolo, categoria: "Arenoso" | "Argiloso"} {
+export function VerificarTipo(tipo: TipoDeSolo, nspt: number): { subtipo: SubTipoSolo, categoria: "Arenoso" | "Argiloso" } {
 	const solos_arenosos: TipoDeSolo[] = [
 		TipoDeSolo.AREIA, TipoDeSolo.AREIA_ARGILOSA, TipoDeSolo.AREIA_ARGILOSSILTOSA,
 		TipoDeSolo.AREIA_SILTOARGILOSA, TipoDeSolo.AREIA_SILTOSA, TipoDeSolo.SILTE_ARENOSO, TipoDeSolo.SILTE_ARENOARGILOSO, TipoDeSolo.SILTE
@@ -74,38 +100,38 @@ export function VerificarTipo(tipo: TipoDeSolo, nspt: number): {subtipo: SubTipo
 
 	if (solos_arenosos.includes(tipo)) {
 		if (nspt > 0 && nspt <= 10) {
-			return {subtipo: SubTipoSolo.AREIA_FOFA, categoria: "Arenoso"}
+			return { subtipo: SubTipoSolo.AREIA_FOFA, categoria: "Arenoso" }
 		} else if (nspt > 10 && nspt <= 30) {
-			return {subtipo: SubTipoSolo.AREIA_MEDIA, categoria: "Arenoso"}
+			return { subtipo: SubTipoSolo.AREIA_MEDIA, categoria: "Arenoso" }
 		} else {
-			return {subtipo: SubTipoSolo.AREIA_COMPACTA, categoria: "Arenoso"}
+			return { subtipo: SubTipoSolo.AREIA_COMPACTA, categoria: "Arenoso" }
 		}
 	} else {
 		if (nspt > 0 && nspt <= 4) {
-			return {subtipo: SubTipoSolo.ARGILA_MOLE, categoria: "Argiloso"}
+			return { subtipo: SubTipoSolo.ARGILA_MOLE, categoria: "Argiloso" }
 		} else if (nspt > 4 && nspt <= 8) {
-			return {subtipo: SubTipoSolo.ARGILA_MEDIA, categoria: "Argiloso"}
+			return { subtipo: SubTipoSolo.ARGILA_MEDIA, categoria: "Argiloso" }
 		} else if (nspt > 8 && nspt <= 30) {
-			return {subtipo: SubTipoSolo.ARGILA_RIJA, categoria: "Argiloso"}
+			return { subtipo: SubTipoSolo.ARGILA_RIJA, categoria: "Argiloso" }
 		}
 		else {
-			return  {subtipo: SubTipoSolo.ARGILA_DURA, categoria: "Argiloso"}
+			return { subtipo: SubTipoSolo.ARGILA_DURA, categoria: "Argiloso" }
 		}
 	}
 }
 
-export function RetornarValorKhEKv(dados: {tipo_solo: TipoDeSolo, nspt: number, submerso: boolean, diametro_largura: number, profundidade: number}){
+export function RetornarValorKhEKv(dados: { tipo_solo: TipoDeSolo, nspt: number, submerso: boolean, diametro_largura: number, profundidade: number }) {
 	const subtipo = VerificarTipo(dados.tipo_solo, dados.nspt)
 	let kh_ger: number
-	if(subtipo.categoria === "Arenoso"){
-		kh_ger = ParamsSubtipoSolo(subtipo.subtipo, dados.submerso).K1*dados.profundidade/dados.diametro_largura
-	}else{
-		kh_ger = 0.2*ParamsSubtipoSolo(subtipo.subtipo, dados.submerso).K1/dados.diametro_largura
+	if (subtipo.categoria === "Arenoso") {
+		kh_ger = ParamsSubtipoSolo(subtipo.subtipo, dados.submerso).K1 * dados.profundidade / dados.diametro_largura
+	} else {
+		kh_ger = 0.2 * ParamsSubtipoSolo(subtipo.subtipo, dados.submerso).K1 / dados.diametro_largura
 	}
-	const kh = kh_ger/100*dados.diametro_largura*100*100*100
-	const kv_ger = subtipo.categoria === "Arenoso" ? kh_ger/0.29 : kh_ger/0.4
-	const kv = kv_ger/100*Math.PI*dados.diametro_largura*100*100*100
-	return {kh, kv}
+	const kh = kh_ger / 100 * dados.diametro_largura * 100 * 100 * 100
+	const kv_ger = subtipo.categoria === "Arenoso" ? kh_ger / 0.29 : kh_ger / 0.4
+	const kv = kv_ger / 100 * Math.PI * dados.diametro_largura * 100 * 100 * 100
+	return { kh, kv }
 }
 
 
@@ -116,7 +142,7 @@ export enum TipoEstaca {
 	METALICA = "Metálica",
 	PRE_MOLDADA = "Pré-moldada",
 	ESCAVADA = "Escavada",
-	RAIZ_HELICE_OMEGA = "Raiz",
+	RAIZ = "Raiz",
 	HELICE_CONTINUJA = "Hélice contínua",
 	OMEGA = "Omega",
 }
@@ -129,7 +155,7 @@ export function fatoresCorrecaoAoki(tipo: TipoEstaca, diametro: number) {
 		[TipoEstaca.METALICA]: { F1: 1.75, F2: 2 * 1.75 },
 		[TipoEstaca.PRE_MOLDADA]: { F1: 1 + diametro * 0.8, F2: 2 * (1 + diametro * 0.8) },
 		[TipoEstaca.ESCAVADA]: { F1: 3.00, F2: 6 },
-		[TipoEstaca.RAIZ_HELICE_OMEGA]: { F1: 2.00, F2: 4 },
+		[TipoEstaca.RAIZ]: { F1: 2.00, F2: 4 },
 		[TipoEstaca.HELICE_CONTINUJA]: { F1: 2.00, F2: 4 },
 		[TipoEstaca.OMEGA]: { F1: 2.00, F2: 4 },
 	}
