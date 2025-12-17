@@ -87,7 +87,7 @@ export function dimensionarBloco2EstacasComMomento(dados: EntradaBloco) {
   const menorDimPilar = Math.min(pilarBx, pilarBy);
   const hNo = Math.min(d, menorDimPilar / 2);
 
-  const C_no = Nd / 2; // kN (resultante no nó do pilar)
+  const C_no = Nd; // kN (resultante no nó do pilar)
 
   const areaNo = menorDimPilar * hNo; // m² (área nodal efetiva)
   const sigmaNo = (C_no * 1e3) / (areaNo * 1e6); // MPa
