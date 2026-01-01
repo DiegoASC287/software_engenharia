@@ -99,9 +99,10 @@ export const CONECTORES_CISALHAMENTO: Record<
         a_fuste: 0
     },
 } as const;
-
-export type CasoRg = "A" | "B" | "C" | "D";
-export type CasoRp = "A" | "B" | "C";
+export const ArrayCasoRg = ["A", "B", "C", "D"] as const;
+export const ArrayCasoRp = ["A", "B", "C"] as const;
+export type CasoRg = typeof ArrayCasoRg[number];
+export type CasoRp = typeof ArrayCasoRp[number];
 
 export interface Rg{
     caso: CasoRg;
@@ -129,3 +130,33 @@ export const RP: Record<
     C: { valor: 0.6 },
     }
 
+export const classe_concreto = ["C20", "C25", "C30", "C35", "C40", "C45", "C50", "C60", "C70", "C80", "C90"] as const;
+export type ClasseConcreto = typeof classe_concreto[number];
+
+export const sel_alfa_i: Record<ClasseConcreto, number> = {
+    "C20": 0.85,
+    "C25": 0.86,
+    "C30": 0.88,
+    "C35": 0.89,
+    "C40": 0.90,
+    "C45": 0.91,
+    "C50": 0.93,
+    "C60": 0.95,
+    "C70": 0.98,
+    "C80": 1.0,
+    "C90": 1.0
+};
+
+export const sel_fck_concreto: Record<ClasseConcreto, number> = {
+    "C20": 20,
+    "C25": 25,
+    "C30": 30,
+    "C35": 35,
+    "C40": 40,
+    "C45": 45,
+    "C50": 50,
+    "C60": 60,
+    "C70": 70,
+    "C80": 80,
+    "C90": 90
+};
