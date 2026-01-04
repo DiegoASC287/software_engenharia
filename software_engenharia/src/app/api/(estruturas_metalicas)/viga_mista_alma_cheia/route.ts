@@ -1,7 +1,8 @@
-import { ArrayCasoRg, ArrayCasoRp, classe_concreto, ConectoresCisalhamento } from "@/funcoes_coeficientes/viga_mista_alma_cheia/coefs_tipagens";
-import { calcular_qrd_conectores, ec, fck } from "@/funcoes_coeficientes/viga_mista_alma_cheia/resultados_parciais";
+import { ArrayCasoRg, ArrayCasoRp, classe_concreto, ConectoresCisalhamento, tipo_aco, tipo_construcao } from "@/funcoes_coeficientes/viga_mista_alma_cheia/coefs_tipagens";
+import { calc_a_int_parc, calc_cad_int_parc, calc_ccd_int_completa, calc_ccd_int_parc, calc_lambda_p, calc_lambda_r, calc_ni_inferiores, calc_tad_int_parc, calc_vrd_secao_compacta, calc_vrd_secao_esbelta, calc_vrd_secao_muito_esbelta, calc_yp_int_parc, calc_yt_yc, calcular_qrd_conectores, ec, fck, fhd, props_mec_aco } from "@/funcoes_coeficientes/viga_mista_alma_cheia/resultados_parciais";
 import { NextResponse } from "next/server";
 import z from "zod";
+import { ca, en } from "zod/locales";
 
 
 const SchemaConector = z.object({
@@ -14,10 +15,49 @@ const SchemaConector = z.object({
         quantidade: z.coerce.number().int().positive("quantidade deve ser inteiro positivo")
     }))
 })
+const SchemaPropsSecao = z.object({
 
+    bf_inf: z.coerce.number().positive("bf_inf deve ser positivo"),
+    tf_inf: z.coerce.number().positive("tf_inf deve ser positivo"),
+    bf_sup: z.coerce.number().positive("bf_sup deve ser positivo"),
+    tf_sup: z.coerce.number().positive("tf_sup deve ser positivo"),
+    h: z.coerce.number().positive("h_w deve ser positivo"),
+    tw: z.coerce.number().positive("tw deve ser positivo"),
+    b: z.coerce.number().positive("b deve ser positivo"),
+    hf: z.coerce.number().positive("hf deve ser positivo"),
+    tc: z.coerce.number().positive("tc deve ser positivo"),
+})
+
+export type ISchemaPropsSecao = z.infer<typeof SchemaPropsSecao>;
+
+const props_geom_viga = z.object({
+    comprimento_viga: z.coerce.number().positive("comprimento_viga deve ser positivo"),
+    comp_destravado: z.coerce.number().positive("comp_destravado deve ser positivo"),
+})
+
+const SchemaPropsEnrijecedores = z.object({
+    altura_enrijecedor: z.coerce.number().positive("altura_enrijecedor deve ser positivo"),
+    largura_enrijecedor: z.coerce.number().positive("largura_enrijecedor deve ser positivo"),
+    espessura_enrijecedor: z.coerce.number().positive("espessura_enrijecedor deve ser positivo"),
+    espacamento_enrijecedor: z.coerce.number().positive("espacamento_enrijecedor deve ser positivo"),
+})
+
+const SchemaSolicitacoes = z.object({
+    Msd: z.coerce.number().nonnegative("Msd deve ser não negativo"),
+    Vsd: z.coerce.number().nonnegative("Vsd deve ser não negativo"),
+})
 const SchemaDimVigaMista = z.object({
     classe_concreto: z.enum(classe_concreto),
-    props_conectores: SchemaConector
+    props_conectores: SchemaConector,
+    classe_aco: z.enum(tipo_aco),
+    secao: SchemaPropsSecao,
+    props_geom_viga,
+    tipo_construcao: z.enum(tipo_construcao),
+    solicitacoes: SchemaSolicitacoes,
+    gama_i: z.coerce.number().positive("gama_i deve ser positivo"),
+    gama_c: z.coerce.number().positive("gama_c deve ser positivo"),
+    enrijecida: z.boolean(),
+    props_enrijecedores: SchemaPropsEnrijecedores.optional(),
 });
 
 export async function POST(request: Request) {
@@ -28,12 +68,13 @@ export async function POST(request: Request) {
         const dados = SchemaDimVigaMista.safeParse(body);
 
         // ✔ cria o modelo
-        if(dados.success){
+        if (dados.success) {
 
-            const {data} = dados;
-    
+            const { data } = dados;
+            const dados_aco = props_mec_aco(data.classe_aco);
+            const d = data.secao.tf_sup + data.secao.h + data.secao.tf_inf;
             // ✔ executa o cálculo
-            const resultado = calcular_qrd_conectores({
+            const resultados_qrd = calcular_qrd_conectores({
                 fck: fck(data.classe_concreto),
                 fucs: data.props_conectores.fucs,
                 EC: ec(data.classe_concreto),
@@ -45,20 +86,112 @@ export async function POST(request: Request) {
                     quantidade: caso.quantidade
                 }))
             })
-    
+
+            const h_sobre_tw = data.secao.h/data.secao.tw
+
+            if(h_sobre_tw > 3.76*Math.sqrt(dados_aco.Es/dados_aco.fyk)){
+                return NextResponse.json({ error: "Relação h/t > r3,76*raiz(E/fy)"}, { status: 400 });
+            }
+
+            let vrd: number = 0
+
+            const props_ni_inferiores = calc_ni_inferiores({
+                props_ni_zero: {
+                    E: dados_aco.Es, fyk: dados_aco.fyk, le: data.props_geom_viga.comprimento_viga, props_mesas: {
+                        bf_inf: data.secao.bf_inf,
+                        tf_inf: data.secao.tf_inf,
+                        bf_sup: data.secao.bf_sup,
+                        tf_sup: data.secao.tf_sup
+                    }
+                },
+                props_cp: { tipo_construcao: data.tipo_construcao },
+                props_cr: {
+                    Mrd: 0, // TODO: calcular Mrd
+                    Msd: data.solicitacoes.Msd
+
+                }
+            })
+            const res_fhd = fhd(data.secao, dados_aco.fyk, data.gama_i, fck(data.classe_concreto), data.gama_c);
+            const ni_i = resultados_qrd.resistencia_total / res_fhd;
+            if (ni_i >= 1) {
+                console.log("Interação completa");
+
+            } else if (ni_i < 1 && ni_i >= Math.max(props_ni_inferiores.ni_min, props_ni_inferiores.ni_cp2crn0)) {
+                console.log("Interação parcial");
+                const res_ccd = calc_ccd_int_parc(resultados_qrd.resistencia_total);
+                const res_cad = calc_cad_int_parc({ props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, ccd: res_ccd });
+                const res_tad = calc_tad_int_parc(res_ccd, res_cad);
+                const yp = calc_yp_int_parc({ cad: res_cad, fyk: dados_aco.fyk, props_secao: data.secao, gama_i: data.gama_i });
+                const yt_yc = calc_yt_yc({ props_secao: data.secao, yp });
+                const a = calc_a_int_parc(res_ccd, fck(data.classe_concreto), data.gama_c, data.secao);
+                const yt = yt_yc.yt;
+                const yc = yt_yc.yc;
+                const mrd = 1 * (res_cad * (d - yt - yc) / 1000 + res_ccd * (data.secao.tc - a / 2 + data.secao.hf + d - yt) / 1000);
+                console.log("Esforço resistente nos conectores (qrd): ", resultados_qrd.resistencia_total);
+                console.log("Esforço solicitante no concreto (ccd): ", res_ccd);
+                console.log("Esforço solicitante de compressão no aço (cad): ", res_cad);
+                console.log("Esforço solicitante de tração no aço (cad): ", res_tad);
+                console.log("Posição da linha neutra a partir do topo do perfil metálico (yp): ", yp);
+                console.log("Posição da linha de influencia da força de compressão do aço (yc): ", yc);
+                console.log("Posição da linha de influencia da força de tração do aço (d-yt): ", d - yt);
+                console.log("Posição da linha neutra no concreto (a): ", a);
+                console.log("Momento resistente da seção (Mrd): ", mrd);
+            } else {
+                console.log("Interação insuficiente");
+            }
+
+            const lambda_p = calc_lambda_p({
+                enrijecida: data.enrijecida,
+                espacamento_enrijs: data.enrijecida ? data.props_enrijecedores?.espacamento_enrijecedor ?? data.props_geom_viga.comprimento_viga*1000 :
+                    data.props_geom_viga.comprimento_viga*1000,
+                hw: data.secao.h,
+
+            },
+                dados_aco.Es,
+                dados_aco.fyk
+            );
+            const lambda_r = calc_lambda_r({
+                enrijecida: data.enrijecida,
+                espacamento_enrijs: data.enrijecida ? data.props_enrijecedores?.espacamento_enrijecedor ?? data.props_geom_viga.comprimento_viga*1000 :
+                    data.props_geom_viga.comprimento_viga*1000,
+                hw: data.secao.h,
+
+            },
+                dados_aco.Es,
+                dados_aco.fyk)
+
+            const lambda = data.secao.h/data.secao.tw;
+            console.log("Lambda: ", lambda);
+            if (lambda <= lambda_p) {
+                vrd = calc_vrd_secao_compacta(data.secao, dados_aco.fyk, data.gama_i);
+            }else if(lambda > lambda_p && lambda < lambda_r){
+                vrd = calc_vrd_secao_esbelta({props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, lambda_p});
+            }else if(lambda >= lambda_r){
+                vrd = calc_vrd_secao_muito_esbelta({props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, lambda_p})
+            }else{
+                vrd = 0;
+            }
+
+
             return NextResponse.json({
                 ok: true,
-                resultado
+                vrd,
+                res_fhd,
+                comparativo_fhd_qrd: ni_i,
+                resultados_qrd,
+                props_ni_inferiores,
             });
-        }else{
-             return NextResponse.json({ error: dados.error.issues.map(e => ({ message: e.message, path: e.path.join('.') }))}, { status: 400 });
+
+
+        } else {
+            return NextResponse.json({ error: dados.error.issues.map(e => ({ message: e.message, path: e.path.join('.') })) }, { status: 400 });
         }
 
     } catch (err: any) {
 
         // ✔ erros de validação do Zod
         if (err) {
-           
+
         }
 
         // ✔ erro inesperado

@@ -133,6 +133,9 @@ export const RP: Record<
 export const classe_concreto = ["C20", "C25", "C30", "C35", "C40", "C45", "C50", "C60", "C70", "C80", "C90"] as const;
 export type ClasseConcreto = typeof classe_concreto[number];
 
+export const tipo_aco = ["A36", "A572", "A992"] as const;
+export type TipoAco = typeof tipo_aco[number];
+
 export const sel_alfa_i: Record<ClasseConcreto, number> = {
     "C20": 0.85,
     "C25": 0.86,
@@ -159,4 +162,19 @@ export const sel_fck_concreto: Record<ClasseConcreto, number> = {
     "C70": 70,
     "C80": 80,
     "C90": 90
+};
+
+export const sel_props_aco: Record<TipoAco, { fyk: number; Es: number }> = {
+    "A36": { fyk: 250, Es: 200000 },
+    "A572": { fyk: 345, Es: 200000 },
+    "A992": { fyk: 450, Es: 200000 },
+};
+
+export const tipo_construcao = ["ESCORADA", "NAO_ESCORADA"] as const;
+export type TipoConstrucao = typeof tipo_construcao[number];
+
+
+export const sel_tipo_construcao: Record<TipoConstrucao, number> = {
+    "ESCORADA": 1.0,
+    "NAO_ESCORADA": 0.85,
 };
