@@ -115,6 +115,24 @@ export async function POST(request: Request) {
             const ni_i = resultados_qrd.resistencia_total / res_fhd;
             if (ni_i >= 1) {
                 console.log("Interação completa");
+                const res_ccd = calc_ccd_int_completa(fck(data.classe_concreto), data.gama_c, data.secao.b, data.secao.tc);
+                const res_cad = calc_cad_int_parc({ props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, ccd: res_ccd });
+                const res_tad = calc_tad_int_parc(res_ccd, res_cad);
+                const yp = calc_yp_int_parc({ cad: res_cad, fyk: dados_aco.fyk, props_secao: data.secao, gama_i: data.gama_i });
+                const yt_yc = calc_yt_yc({ props_secao: data.secao, yp });
+                const a = calc_a_int_parc(res_ccd, fck(data.classe_concreto), data.gama_c, data.secao);
+                const yt = yt_yc.yt;
+                const yc = yt_yc.yc;
+                const mrd = 1 * (resultados_qrd.resistencia_total * (d - yt - yc) / 1000 + res_ccd * (data.secao.tc/2 + data.secao.hf + d - yt) / 1000);
+                console.log("Esforço resistente nos conectores (qrd): ", resultados_qrd.resistencia_total);
+                console.log("Esforço solicitante no concreto (ccd): ", res_ccd);
+                console.log("Esforço solicitante de compressão no aço (cad): ", res_cad);
+                console.log("Esforço solicitante de tração no aço (cad): ", res_tad);
+                console.log("Posição da linha neutra a partir do topo do perfil metálico (yp): ", yp);
+                console.log("Posição da linha de influencia da força de compressão do aço (yc): ", yc);
+                console.log("Posição da linha de influencia da força de tração do aço (d-yt): ", d - yt);
+                console.log("Posição da linha neutra no concreto (a): ", a);
+                console.log("Momento resistente da seção (Mrd): ", mrd);
 
             } else if (ni_i < 1 && ni_i >= Math.max(props_ni_inferiores.ni_min, props_ni_inferiores.ni_cp2crn0)) {
                 console.log("Interação parcial");
