@@ -1,8 +1,7 @@
-import { ArrayCasoRg, ArrayCasoRp, classe_concreto, ConectoresCisalhamento, tipo_aco, tipo_construcao } from "@/funcoes_coeficientes/viga_mista_alma_cheia/coefs_tipagens";
+import { ArrayCasoRg, ArrayCasoRp, CasoRg, CasoRp, classe_concreto, ConectoresCisalhamento, tipo_aco, tipo_construcao, TipoConectorCisalhamento } from "@/funcoes_coeficientes/viga_mista_alma_cheia/coefs_tipagens";
 import { calc_a_int_parc, calc_cad_int_parc, calc_ccd_int_completa, calc_ccd_int_parc, calc_lambda_p, calc_lambda_r, calc_ni_inferiores, calc_tad_int_parc, calc_vrd_secao_compacta, calc_vrd_secao_esbelta, calc_vrd_secao_muito_esbelta, calc_yp_int_parc, calc_yt_yc, calcular_qrd_conectores, ec, fck, fhd, props_mec_aco } from "@/funcoes_coeficientes/viga_mista_alma_cheia/resultados_parciais";
 import { NextResponse } from "next/server";
 import z from "zod";
-import { ca, en } from "zod/locales";
 
 
 const SchemaConector = z.object({
@@ -59,6 +58,56 @@ const SchemaDimVigaMista = z.object({
     enrijecida: z.boolean(),
     props_enrijecedores: SchemaPropsEnrijecedores.optional(),
 });
+interface CasosConectores {
+        caso_rg: "A" | "B" | "C" | "D";
+        rg: number;
+        caso_rp: "A" | "B" | "C";
+        rp: number;
+        quantidade: number;
+        qrd_conc: number;
+        acs: number;
+        fck: number;
+        ec: number;
+        fucs: number;
+        qrd_conector: number;
+        resistencia_utilizada: number;
+    
+}
+
+interface ResultConectores {
+    conector: TipoConectorCisalhamento
+    fucs: number
+    configuracoes: CasosConectores[]
+    qrd: number
+}
+
+interface ResultFlexao {
+    esbeltez_secao: "COMPACTA" | "MEDIANAMENTE ESBELTA" | "MUITO ESBELTA"
+    compressao_conc_ccd: number
+    compressao_aco_cad: number
+    tracao_aco_tad: number
+    pos_ln_yp: number
+    pos_ln_comp_aco_yc: number
+    pos_ln_trac_aco_yt: number
+    pos_ln_conc_a: number
+    mrd: number
+}
+
+interface ResultCisalhamento {
+    lambda: number
+    lambda_p: number
+    lambda_r: number
+    espacamento_enrijecedores: number
+    vpl: number
+    vrd: number
+
+}
+
+export interface ModeloRetornoDados{
+    resultados_conectores: ResultConectores
+    resultados_flexao: ResultFlexao
+    resultados_cisalhamento: ResultCisalhamento
+}
 
 export async function POST(request: Request) {
     try {
@@ -92,8 +141,19 @@ export async function POST(request: Request) {
             if(h_sobre_tw > 3.76*Math.sqrt(dados_aco.Es/dados_aco.fyk)){
                 return NextResponse.json({ error: "Relação h/t > r3,76*raiz(E/fy)"}, { status: 400 });
             }
+            let result_vrd: {vpl: number, vrd: number}
+            const result_flexao: ResultFlexao = {
+                compressao_aco_cad: 0,
+                compressao_conc_ccd: 0,  
+                esbeltez_secao: "MUITO ESBELTA",
+                mrd: 0,
+                pos_ln_comp_aco_yc: 0,
+                pos_ln_conc_a: 0,
+                pos_ln_yp: 0,
+                tracao_aco_tad:0,
+                pos_ln_trac_aco_yt: 0
 
-            let vrd: number = 0
+            }
 
             const props_ni_inferiores = calc_ni_inferiores({
                 props_ni_zero: {
@@ -145,15 +205,15 @@ export async function POST(request: Request) {
                 const yt = yt_yc.yt;
                 const yc = yt_yc.yc;
                 const mrd = 1 * (res_cad * (d - yt - yc) / 1000 + res_ccd * (data.secao.tc - a / 2 + data.secao.hf + d - yt) / 1000);
-                console.log("Esforço resistente nos conectores (qrd): ", resultados_qrd.resistencia_total);
-                console.log("Esforço solicitante no concreto (ccd): ", res_ccd);
-                console.log("Esforço solicitante de compressão no aço (cad): ", res_cad);
-                console.log("Esforço solicitante de tração no aço (cad): ", res_tad);
-                console.log("Posição da linha neutra a partir do topo do perfil metálico (yp): ", yp);
-                console.log("Posição da linha de influencia da força de compressão do aço (yc): ", yc);
-                console.log("Posição da linha de influencia da força de tração do aço (d-yt): ", d - yt);
-                console.log("Posição da linha neutra no concreto (a): ", a);
-                console.log("Momento resistente da seção (Mrd): ", mrd);
+                result_flexao["compressao_conc_ccd"] = res_ccd
+                result_flexao["compressao_aco_cad"] = res_cad
+                result_flexao["tracao_aco_tad"] = res_tad
+                result_flexao["pos_ln_yp"] = yp
+                result_flexao["pos_ln_trac_aco_yt"] = yt
+                result_flexao["pos_ln_comp_aco_yc"] = yc
+                result_flexao["pos_ln_conc_a"] = a
+                result_flexao["mrd"] = mrd
+
             } else {
                 console.log("Interação insuficiente");
             }
@@ -181,24 +241,38 @@ export async function POST(request: Request) {
             const lambda = data.secao.h/data.secao.tw;
             console.log("Lambda: ", lambda);
             if (lambda <= lambda_p) {
-                vrd = calc_vrd_secao_compacta(data.secao, dados_aco.fyk, data.gama_i);
+                result_flexao["esbeltez_secao"] = "COMPACTA"
+                result_vrd = calc_vrd_secao_compacta(data.secao, dados_aco.fyk, data.gama_i);
             }else if(lambda > lambda_p && lambda < lambda_r){
-                vrd = calc_vrd_secao_esbelta({props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, lambda_p});
+                result_flexao["esbeltez_secao"] = "MEDIANAMENTE ESBELTA"
+                result_vrd = calc_vrd_secao_esbelta({props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, lambda_p});
             }else if(lambda >= lambda_r){
-                vrd = calc_vrd_secao_muito_esbelta({props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, lambda_p})
+                result_flexao["esbeltez_secao"] = "MUITO ESBELTA"
+                result_vrd = calc_vrd_secao_muito_esbelta({props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, lambda_p})
             }else{
-                vrd = 0;
+                result_vrd = {vpl: 0,vrd: 0};
             }
 
 
-            return NextResponse.json({
-                ok: true,
-                vrd,
-                res_fhd,
-                comparativo_fhd_qrd: ni_i,
-                resultados_qrd,
-                props_ni_inferiores,
-            });
+            const resultados: ModeloRetornoDados = {
+                resultados_conectores: {
+                    conector: data.props_conectores.conector,
+                    configuracoes: resultados_qrd.casos,
+                    fucs: data.props_conectores.fucs,
+                    qrd: resultados_qrd.resistencia_total
+                },
+                resultados_cisalhamento: {
+                    espacamento_enrijecedores: data.props_enrijecedores?.espacamento_enrijecedor ?? Infinity,
+                    lambda,
+                    lambda_p,
+                    lambda_r,
+                    vpl: result_vrd.vpl,
+                    vrd: result_vrd.vrd
+                },
+                resultados_flexao: result_flexao
+            }
+            
+            return NextResponse.json({resultados});
 
 
         } else {

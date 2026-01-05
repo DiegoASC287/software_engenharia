@@ -1,6 +1,5 @@
 import { ISchemaPropsSecao } from "@/app/api/(estruturas_metalicas)/viga_mista_alma_cheia/route";
 import { CasoRg, CasoRp, ClasseConcreto, ConectorCisalhamento, CONECTORES_CISALHAMENTO, RG, RP, sel_alfa_i, sel_fck_concreto, sel_props_aco, sel_tipo_construcao, TipoAco, TipoConectorCisalhamento, TipoConstrucao } from "./coefs_tipagens";
-import { ca } from "zod/locales";
 
 export function select_conector(nome: TipoConectorCisalhamento): ConectorCisalhamento {
     const dados = CONECTORES_CISALHAMENTO[nome];
@@ -280,10 +279,11 @@ export function calc_lambda_r(props_enrij: PropsKv, E: number, fyk: number): num
     return lambda_r;
 }
 
-export function calc_vrd_secao_compacta(props_secao: ISchemaPropsSecao, fyk: number, gama_i: number): number {
-    const vrd = calc_vpl({ props_secao, fyk }) / (gama_i);
+export function calc_vrd_secao_compacta(props_secao: ISchemaPropsSecao, fyk: number, gama_i: number): {vpl: number, vrd: number} {
+    const vpl = calc_vpl({ props_secao, fyk })
+    const vrd =  vpl/ (gama_i);
     console.log("Cálculo de Vrd para seção compacta: ", { props_secao, fyk, gama_i, vrd });
-    return vrd;
+    return {vpl, vrd};
 }
 
 interface PropsVrdSecaoEsbelta {
@@ -293,16 +293,19 @@ interface PropsVrdSecaoEsbelta {
     gama_i: number,
 }
 
-export function calc_vrd_secao_esbelta({ lambda_p, props_secao, fyk, gama_i }: PropsVrdSecaoEsbelta): number {
+export function calc_vrd_secao_esbelta({ lambda_p, props_secao, fyk, gama_i }: PropsVrdSecaoEsbelta): {vpl: number, vrd: number} {
     const lambda = props_secao.h / props_secao.tw;
-    const vrd = lambda_p / lambda * calc_vpl({ props_secao, fyk }) / (gama_i);
+    const vpl = calc_vpl({ props_secao, fyk })
+    const vrd = lambda_p / lambda * vpl / (gama_i);
     console.log("Cálculo de Vrd para seção esbelta: ", { lambda_p, props_secao, fyk, gama_i, vrd });
-    return vrd;
+    return {vpl, vrd};
 }
 
-export function calc_vrd_secao_muito_esbelta({ lambda_p, props_secao, fyk, gama_i }: PropsVrdSecaoEsbelta): number {
+export function calc_vrd_secao_muito_esbelta({ lambda_p, props_secao, fyk, gama_i }: PropsVrdSecaoEsbelta): {vpl: number, vrd: number} {
     const lambda = props_secao.h / props_secao.tw;
-    const vrd = 1.24 * (lambda_p / lambda) ** 2 * calc_vpl({ props_secao, fyk }) / (gama_i);
+    const vpl = calc_vpl({ props_secao, fyk })
+    const vrd = 1.24 * (lambda_p / lambda) ** 2 * vpl / (gama_i);
+
     console.log("Cálculo de Vrd para seção muito esbelta: ", { lambda_p, props_secao, fyk, gama_i, vrd });
-    return vrd;
+    return {vpl, vrd};
 }
