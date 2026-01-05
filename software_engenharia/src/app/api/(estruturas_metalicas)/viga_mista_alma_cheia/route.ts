@@ -58,20 +58,22 @@ const SchemaDimVigaMista = z.object({
     enrijecida: z.boolean(),
     props_enrijecedores: SchemaPropsEnrijecedores.optional(),
 });
+
+export type ISchemaDimVigaMista = z.infer<typeof SchemaDimVigaMista>;
 interface CasosConectores {
-        caso_rg: "A" | "B" | "C" | "D";
-        rg: number;
-        caso_rp: "A" | "B" | "C";
-        rp: number;
-        quantidade: number;
-        qrd_conc: number;
-        acs: number;
-        fck: number;
-        ec: number;
-        fucs: number;
-        qrd_conector: number;
-        resistencia_utilizada: number;
-    
+    caso_rg: "A" | "B" | "C" | "D";
+    rg: number;
+    caso_rp: "A" | "B" | "C";
+    rp: number;
+    quantidade: number;
+    qrd_conc: number;
+    acs: number;
+    fck: number;
+    ec: number;
+    fucs: number;
+    qrd_conector: number;
+    resistencia_utilizada: number;
+
 }
 
 interface ResultConectores {
@@ -82,7 +84,7 @@ interface ResultConectores {
 }
 
 interface ResultFlexao {
-    esbeltez_secao: "COMPACTA" | "MEDIANAMENTE ESBELTA" | "MUITO ESBELTA"
+
     compressao_conc_ccd: number
     compressao_aco_cad: number
     tracao_aco_tad: number
@@ -103,10 +105,13 @@ interface ResultCisalhamento {
 
 }
 
-export interface ModeloRetornoDados{
+export interface ModeloRetornoDados {
+    dados_entrada: ISchemaDimVigaMista
     resultados_conectores: ResultConectores
     resultados_flexao: ResultFlexao
     resultados_cisalhamento: ResultCisalhamento
+    interacao: "INTERAÇÃO PARCIAL" | "INTERAÇÃO COMPLETA" | "NAO CALCULADO"
+    esbeltez_secao: "COMPACTA" | "MEDIANAMENTE ESBELTA" | "MUITO ESBELTA"
 }
 
 export async function POST(request: Request) {
@@ -136,24 +141,27 @@ export async function POST(request: Request) {
                 }))
             })
 
-            const h_sobre_tw = data.secao.h/data.secao.tw
+            const h_sobre_tw = data.secao.h / data.secao.tw
+            let interacao: "INTERAÇÃO PARCIAL" | "INTERAÇÃO COMPLETA" | "NAO CALCULADO"
+            let esbeltez_secao: "COMPACTA" | "MEDIANAMENTE ESBELTA" | "MUITO ESBELTA"
 
-            if(h_sobre_tw > 3.76*Math.sqrt(dados_aco.Es/dados_aco.fyk)){
-                return NextResponse.json({ error: "Relação h/t > r3,76*raiz(E/fy)"}, { status: 400 });
+            if (h_sobre_tw > 3.76 * Math.sqrt(dados_aco.Es / dados_aco.fyk)) {
+                return NextResponse.json({ error: "Relação h/t > r3,76*raiz(E/fy)" }, { status: 400 });
             }
-            let result_vrd: {vpl: number, vrd: number}
+            let result_vrd: { vpl: number, vrd: number }
             const result_flexao: ResultFlexao = {
                 compressao_aco_cad: 0,
-                compressao_conc_ccd: 0,  
-                esbeltez_secao: "MUITO ESBELTA",
+                compressao_conc_ccd: 0,
                 mrd: 0,
                 pos_ln_comp_aco_yc: 0,
                 pos_ln_conc_a: 0,
                 pos_ln_yp: 0,
-                tracao_aco_tad:0,
+                tracao_aco_tad: 0,
                 pos_ln_trac_aco_yt: 0
 
             }
+            interacao = "NAO CALCULADO"
+            esbeltez_secao = "COMPACTA"
 
             const props_ni_inferiores = calc_ni_inferiores({
                 props_ni_zero: {
@@ -174,6 +182,7 @@ export async function POST(request: Request) {
             const res_fhd = fhd(data.secao, dados_aco.fyk, data.gama_i, fck(data.classe_concreto), data.gama_c);
             const ni_i = resultados_qrd.resistencia_total / res_fhd;
             if (ni_i >= 1) {
+                interacao = "INTERAÇÃO COMPLETA"
                 console.log("Interação completa");
                 const res_ccd = calc_ccd_int_completa(fck(data.classe_concreto), data.gama_c, data.secao.b, data.secao.tc);
                 const res_cad = calc_cad_int_parc({ props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, ccd: res_ccd });
@@ -183,7 +192,7 @@ export async function POST(request: Request) {
                 const a = calc_a_int_parc(res_ccd, fck(data.classe_concreto), data.gama_c, data.secao);
                 const yt = yt_yc.yt;
                 const yc = yt_yc.yc;
-                const mrd = 1 * (resultados_qrd.resistencia_total * (d - yt - yc) / 1000 + res_ccd * (data.secao.tc/2 + data.secao.hf + d - yt) / 1000);
+                const mrd = 1 * (resultados_qrd.resistencia_total * (d - yt - yc) / 1000 + res_ccd * (data.secao.tc / 2 + data.secao.hf + d - yt) / 1000);
                 console.log("Esforço resistente nos conectores (qrd): ", resultados_qrd.resistencia_total);
                 console.log("Esforço solicitante no concreto (ccd): ", res_ccd);
                 console.log("Esforço solicitante de compressão no aço (cad): ", res_cad);
@@ -196,6 +205,7 @@ export async function POST(request: Request) {
 
             } else if (ni_i < 1 && ni_i >= Math.max(props_ni_inferiores.ni_min, props_ni_inferiores.ni_cp2crn0)) {
                 console.log("Interação parcial");
+                interacao = "INTERAÇÃO PARCIAL"
                 const res_ccd = calc_ccd_int_parc(resultados_qrd.resistencia_total);
                 const res_cad = calc_cad_int_parc({ props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, ccd: res_ccd });
                 const res_tad = calc_tad_int_parc(res_ccd, res_cad);
@@ -220,8 +230,8 @@ export async function POST(request: Request) {
 
             const lambda_p = calc_lambda_p({
                 enrijecida: data.enrijecida,
-                espacamento_enrijs: data.enrijecida ? data.props_enrijecedores?.espacamento_enrijecedor ?? data.props_geom_viga.comprimento_viga*1000 :
-                    data.props_geom_viga.comprimento_viga*1000,
+                espacamento_enrijs: data.enrijecida ? data.props_enrijecedores?.espacamento_enrijecedor ?? data.props_geom_viga.comprimento_viga * 1000 :
+                    data.props_geom_viga.comprimento_viga * 1000,
                 hw: data.secao.h,
 
             },
@@ -230,37 +240,38 @@ export async function POST(request: Request) {
             );
             const lambda_r = calc_lambda_r({
                 enrijecida: data.enrijecida,
-                espacamento_enrijs: data.enrijecida ? data.props_enrijecedores?.espacamento_enrijecedor ?? data.props_geom_viga.comprimento_viga*1000 :
-                    data.props_geom_viga.comprimento_viga*1000,
+                espacamento_enrijs: data.enrijecida ? data.props_enrijecedores?.espacamento_enrijecedor ?? data.props_geom_viga.comprimento_viga * 1000 :
+                    data.props_geom_viga.comprimento_viga * 1000,
                 hw: data.secao.h,
 
             },
                 dados_aco.Es,
                 dados_aco.fyk)
 
-            const lambda = data.secao.h/data.secao.tw;
+            const lambda = data.secao.h / data.secao.tw;
             console.log("Lambda: ", lambda);
             if (lambda <= lambda_p) {
-                result_flexao["esbeltez_secao"] = "COMPACTA"
+
                 result_vrd = calc_vrd_secao_compacta(data.secao, dados_aco.fyk, data.gama_i);
-            }else if(lambda > lambda_p && lambda < lambda_r){
-                result_flexao["esbeltez_secao"] = "MEDIANAMENTE ESBELTA"
-                result_vrd = calc_vrd_secao_esbelta({props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, lambda_p});
-            }else if(lambda >= lambda_r){
-                result_flexao["esbeltez_secao"] = "MUITO ESBELTA"
-                result_vrd = calc_vrd_secao_muito_esbelta({props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, lambda_p})
-            }else{
-                result_vrd = {vpl: 0,vrd: 0};
+            } else if (lambda > lambda_p && lambda < lambda_r) {
+                result_vrd = calc_vrd_secao_esbelta({ props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, lambda_p });
+            } else if (lambda >= lambda_r) {
+                result_vrd = calc_vrd_secao_muito_esbelta({ props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, lambda_p })
+            } else {
+                result_vrd = { vpl: 0, vrd: 0 };
             }
 
 
             const resultados: ModeloRetornoDados = {
+                dados_entrada: data,
                 resultados_conectores: {
                     conector: data.props_conectores.conector,
                     configuracoes: resultados_qrd.casos,
                     fucs: data.props_conectores.fucs,
                     qrd: resultados_qrd.resistencia_total
                 },
+                esbeltez_secao,
+                interacao,
                 resultados_cisalhamento: {
                     espacamento_enrijecedores: data.props_enrijecedores?.espacamento_enrijecedor ?? Infinity,
                     lambda,
@@ -269,10 +280,10 @@ export async function POST(request: Request) {
                     vpl: result_vrd.vpl,
                     vrd: result_vrd.vrd
                 },
-                resultados_flexao: result_flexao
+                resultados_flexao: result_flexao,
             }
-            
-            return NextResponse.json({resultados});
+
+            return NextResponse.json({ resultados });
 
 
         } else {
