@@ -15,7 +15,6 @@ const SchemaConector = z.object({
     }))
 })
 const SchemaPropsSecao = z.object({
-
     bf_inf: z.coerce.number().positive("bf_inf deve ser positivo"),
     tf_inf: z.coerce.number().positive("tf_inf deve ser positivo"),
     bf_sup: z.coerce.number().positive("bf_sup deve ser positivo"),
@@ -61,26 +60,30 @@ const SchemaDimVigaMista = z.object({
 
 export type ISchemaDimVigaMista = z.infer<typeof SchemaDimVigaMista>;
 interface CasosConectores {
-    caso_rg: "A" | "B" | "C" | "D";
-    rg: number;
-    caso_rp: "A" | "B" | "C";
-    rp: number;
-    quantidade: number;
-    qrd_conc: number;
-    acs: number;
-    fck: number;
-    ec: number;
-    fucs: number;
-    qrd_conector: number;
-    resistencia_utilizada: number;
-
-}
+        caso_rg: "A" | "B" | "C" | "D";
+        rg: number;
+        caso_rp: "A" | "B" | "C";
+        rp: number;
+        quantidade: number;
+        qrd_conc: number;
+        acs: number;
+        fck: number;
+        ec: number;
+        fucs: number;
+        qrd_conector: number;
+        resistencia_utilizada: number;
+    }
+type TipoInteracao = "INTERAÇÃO PARCIAL" | "INTERAÇÃO COMPLETA" | "SEM INTERACAO" | "NAO CALCULADO"
 
 interface ResultConectores {
+    resistencia_total: number;
+    grau_interacao: TipoInteracao
+    ni: number
+    ni_min: number
     conector: TipoConectorCisalhamento
+    gama_cs: number;
     fucs: number
-    configuracoes: CasosConectores[]
-    qrd: number
+    casos: CasosConectores[];
 }
 
 interface ResultFlexao {
@@ -110,7 +113,7 @@ export interface ModeloRetornoDados {
     resultados_conectores: ResultConectores
     resultados_flexao: ResultFlexao
     resultados_cisalhamento: ResultCisalhamento
-    interacao: "INTERAÇÃO PARCIAL" | "INTERAÇÃO COMPLETA" | "NAO CALCULADO"
+    interacao: TipoInteracao
     esbeltez_secao: "COMPACTA" | "MEDIANAMENTE ESBELTA" | "MUITO ESBELTA"
 }
 
@@ -128,6 +131,7 @@ export async function POST(request: Request) {
             const dados_aco = props_mec_aco(data.classe_aco);
             const d = data.secao.tf_sup + data.secao.h + data.secao.tf_inf;
             // ✔ executa o cálculo
+
             const resultados_qrd = calcular_qrd_conectores({
                 fck: fck(data.classe_concreto),
                 fucs: data.props_conectores.fucs,
@@ -140,10 +144,17 @@ export async function POST(request: Request) {
                     quantidade: caso.quantidade
                 }))
             })
+            const res_qrd: ResultConectores = {
+                ...resultados_qrd, grau_interacao: 'NAO CALCULADO', ni: 0, ni_min: 0,
+                fucs: data.props_conectores.fucs, gama_cs: data.props_conectores.gama_cs,
+                conector: data.props_conectores.conector,
+                
+            }
 
             const h_sobre_tw = data.secao.h / data.secao.tw
             let interacao: "INTERAÇÃO PARCIAL" | "INTERAÇÃO COMPLETA" | "NAO CALCULADO"
             let esbeltez_secao: "COMPACTA" | "MEDIANAMENTE ESBELTA" | "MUITO ESBELTA"
+
 
             if (h_sobre_tw > 3.76 * Math.sqrt(dados_aco.Es / dados_aco.fyk)) {
                 return NextResponse.json({ error: "Relação h/t > r3,76*raiz(E/fy)" }, { status: 400 });
@@ -181,8 +192,11 @@ export async function POST(request: Request) {
             })
             const res_fhd = fhd(data.secao, dados_aco.fyk, data.gama_i, fck(data.classe_concreto), data.gama_c);
             const ni_i = resultados_qrd.resistencia_total / res_fhd;
+            res_qrd["ni"] = ni_i
+            res_qrd["ni_min"] = Math.max(props_ni_inferiores.ni_min, props_ni_inferiores.ni_cp2crn0)
             if (ni_i >= 1) {
                 interacao = "INTERAÇÃO COMPLETA"
+                res_qrd["grau_interacao"] = "INTERAÇÃO COMPLETA"
                 console.log("Interação completa");
                 const res_ccd = calc_ccd_int_completa(fck(data.classe_concreto), data.gama_c, data.secao.b, data.secao.tc);
                 const res_cad = calc_cad_int_parc({ props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, ccd: res_ccd });
@@ -205,6 +219,7 @@ export async function POST(request: Request) {
 
             } else if (ni_i < 1 && ni_i >= Math.max(props_ni_inferiores.ni_min, props_ni_inferiores.ni_cp2crn0)) {
                 console.log("Interação parcial");
+                res_qrd["grau_interacao"] = "INTERAÇÃO PARCIAL"
                 interacao = "INTERAÇÃO PARCIAL"
                 const res_ccd = calc_ccd_int_parc(resultados_qrd.resistencia_total);
                 const res_cad = calc_cad_int_parc({ props_secao: data.secao, fyk: dados_aco.fyk, gama_i: data.gama_i, ccd: res_ccd });
@@ -219,13 +234,14 @@ export async function POST(request: Request) {
                 result_flexao["compressao_aco_cad"] = res_cad
                 result_flexao["tracao_aco_tad"] = res_tad
                 result_flexao["pos_ln_yp"] = yp
-                result_flexao["pos_ln_trac_aco_yt"] = yt
+                result_flexao["pos_ln_trac_aco_yt"] = d - yt
                 result_flexao["pos_ln_comp_aco_yc"] = yc
                 result_flexao["pos_ln_conc_a"] = a
                 result_flexao["mrd"] = mrd
 
             } else {
                 console.log("Interação insuficiente");
+                res_qrd["grau_interacao"] = "SEM INTERACAO"
             }
 
             const lambda_p = calc_lambda_p({
@@ -264,12 +280,7 @@ export async function POST(request: Request) {
 
             const resultados: ModeloRetornoDados = {
                 dados_entrada: data,
-                resultados_conectores: {
-                    conector: data.props_conectores.conector,
-                    configuracoes: resultados_qrd.casos,
-                    fucs: data.props_conectores.fucs,
-                    qrd: resultados_qrd.resistencia_total
-                },
+                resultados_conectores: res_qrd,
                 esbeltez_secao,
                 interacao,
                 resultados_cisalhamento: {
