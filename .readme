@@ -1,0 +1,22 @@
+Projeto: software_engenharia
+
+Descrição breve:
+- Repositório para o projeto de desenvolvimento listado em "software_engenharia".
+- Estrutura principal encontrada na raiz: .git, package-lock.json, software_engenharia/
+
+Conteúdo principal da pasta software_engenharia:
+- .gitignore
+- next.config.ts
+- package-lock.json
+- package.json
+- postcss.config.mjs
+- public/
+- README.md
+- src/
+- tsconfig.json
+
+Notas:
+- Este arquivo foi gerado com base na listagem atual do repositório.
+- Use software_engenharia/README.md para documentação específica do frontend/Next.js.
+
+Gerado em: 2026-01-06T21:27:10.454Z
