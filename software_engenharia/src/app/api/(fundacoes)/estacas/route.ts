@@ -1,4 +1,6 @@
-import { BuscarFatorGrupo, fatoresCorrecaoAoki, ParamsTipoSoloAoki, RetornarValorKhEKv, TipoDeSolo, TipoEstaca } from "@/funcoes_coeficientes/fundacoes/dimensionamento_estacas";
+import { BuscarFatorGrupo, calc_s, calcVrd2, fatoresCorrecaoAoki, ParamsTipoSoloAoki, RetornarValorKhEKv, TipoDeSolo, TipoEstaca } from "@/funcoes_coeficientes/fundacoes/dimensionamento_estacas";
+import { classe_concreto, sel_gama_c, select_gama_c } from "@/funcoes_coeficientes/viga_mista_alma_cheia/coefs_tipagens";
+import { fck } from "@/funcoes_coeficientes/viga_mista_alma_cheia/resultados_parciais";
 import { NextRequest, NextResponse } from "next/server";
 import z from "zod";
 const PropsEntradaEstaca = z.object({
@@ -7,14 +9,21 @@ const PropsEntradaEstaca = z.object({
         tipo_solo: z.enum(TipoDeSolo),
         submerso: z.boolean(),
     })),
-    Nsd: z.coerce.number().min(0),
+    classe_concreto: z.enum(classe_concreto),
+    Nsd: z.coerce.number(),
+    diametro_arm_transv: z.coerce.number(),
+    diametro_arm_long: z.coerce.number(),
     prof_apoio: z.coerce.number().min(0),
     diametro: z.coerce.number().min(0),
+    cobrimento: z.coerce.number().nonnegative(),
     espacamento: z.coerce.number(),
     tipo_estaca: z.enum(TipoEstaca),
     fl: z.coerce.number().min(1),
     fp: z.coerce.number().min(1),
-    cota_topo_estaca: z.coerce.number()
+    cota_topo_estaca: z.coerce.number(),
+    fykw: z.coerce.number(),
+    gama_i: z.coerce.number(),
+    vsd: z.coerce.number()
 })
 
 interface ResultadoCalculoEstaca {
@@ -39,11 +48,21 @@ interface ResultadoCalculoEstaca {
 type IPropsEntradaEstaca = z.infer<typeof PropsEntradaEstaca>;
 
 function calcCapAokiVelloso({ Nsd, diametro, tipo_estaca,
-    spt, prof_apoio, fl, fp, espacamento, cota_topo_estaca}: IPropsEntradaEstaca): ResultadoCalculoEstaca[] {
+    spt, prof_apoio, fl, fp, espacamento, cota_topo_estaca, cobrimento,
+    classe_concreto, diametro_arm_long, diametro_arm_transv, fykw, gama_i, vsd
+
+}: IPropsEntradaEstaca): {resistencia: ResultadoCalculoEstaca[], espacamento_estribos: any} {
     const fator_reducao_grupo = BuscarFatorGrupo(espacamento, diametro, tipo_estaca)
     const { F1, F2 } = fatoresCorrecaoAoki(tipo_estaca, diametro);
     // Cálculo da capacidade de carga da estaca segundo Aoki & Velloso (1975)
     const resistecia: ResultadoCalculoEstaca[] = []
+    const fck_conc = fck(classe_concreto)
+    const gama_c = select_gama_c(tipo_estaca, fck_conc, false)
+    const espacamento_estribos = calc_s({
+        fyd: fykw/gama_i, cobrimento_estaca: cobrimento,
+        diametro_arm_transv, diametro_barra_long: diametro_arm_long,
+        diametro_estaca: diametro, fck:fck_conc, gama_c, vsd})
+    
     let profundidade_atual = 1;
     while (profundidade_atual <= prof_apoio) {
         const cota_atual = cota_topo_estaca-profundidade_atual
@@ -68,29 +87,40 @@ function calcCapAokiVelloso({ Nsd, diametro, tipo_estaca,
         const teste = {
             cota_atual,
             profundidade: profundidade_atual, tipo_solo: nspt_cur.tipo_solo, nspt: nspt_cur.nspt, F1, F2, K,
-            Qs: qs_cur, Qp: Qp_cur, Qacum: qtot, Qrd: qrd, Nsd, Nsd_pp: Nsd_pp_cur, Nsd_tot, kh, kv, eta_g_grupo: fator_reducao_grupo
+            Qs: qs_cur, Qp: Qp_cur, Qacum: qtot, Qrd: qrd, Nsd, Nsd_pp: Nsd_pp_cur, Nsd_tot, kh, kv,
+            eta_g_grupo: fator_reducao_grupo
         }
         resistecia.push({...teste});
-        console.log(teste)
         if (resistecia.slice(-1)[0].Qrd > Nsd_tot) {
-            return resistecia;
+            return {resistencia: resistecia, espacamento_estribos};
         }
         profundidade_atual += 1;
     }
-    return resistecia;
+    return {resistencia: resistecia, espacamento_estribos};
 }
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        console.log("Corpo da requisição recebido:", body);
         const resultado = PropsEntradaEstaca.safeParse(body);
         if (!resultado.success) {
             return NextResponse.json({ error: resultado.error.issues.map(e => ({ message: e.message, path: e.path.join('.') })) }, { status: 400 });
         }
 
-        const { spt, Nsd, diametro, tipo_estaca, prof_apoio, fl, fp, espacamento, cota_topo_estaca } = resultado.data;
+        const { cobrimento, diametro_arm_long, diametro_arm_transv, 
+            spt, Nsd, diametro, tipo_estaca, prof_apoio, fl, fp,
+            espacamento, cota_topo_estaca, classe_concreto, fykw, gama_i,vsd } = resultado.data;
 
-        const resultados = calcCapAokiVelloso({ spt, Nsd, diametro, tipo_estaca, prof_apoio, fl, fp, espacamento, cota_topo_estaca});
+        const resultados = calcCapAokiVelloso({ 
+            spt, Nsd, diametro, tipo_estaca,
+            prof_apoio, fl, fp, espacamento,
+            cota_topo_estaca, classe_concreto,
+            cobrimento,
+            diametro_arm_long,
+            diametro_arm_transv,
+            fykw,
+            gama_i,
+            vsd
+        });
 
         return NextResponse.json({ resultados });
 

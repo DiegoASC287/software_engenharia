@@ -1,3 +1,5 @@
+import { DiametrosComerciais, sel_as } from "../viga_mista_alma_cheia/coefs_tipagens"
+
 // Enum com todos os tipos de solo
 export enum TipoDeSolo {
 	AREIA = "Areia",
@@ -64,12 +66,12 @@ export function BuscarFatorGrupo(espacamento: number, diametro: number, tipo_est
 		} else {
 			return 0.65
 		}
-	}else{
+	} else {
 		if (espacamento / diametro > 3) {
 			return 1
 		} else if (espacamento / diametro >= 2.5) {
 			return 0.95
-		}  else {
+		} else {
 			return 0.65
 		}
 	}
@@ -163,4 +165,116 @@ export function fatoresCorrecaoAoki(tipo: TipoEstaca, diametro: number) {
 }
 
 
-export function calculaCapacidadeCargaEstacaAoki() { }
+
+/**
+ * 
+ * @param fck Fck em MPA
+ * @returns 
+ */
+export function calc_alfa2(fck: number) {
+	return 1 - fck / 250
+}
+
+/**
+ * 
+ * @param diametro_estaca Unidade em cm
+ * @param cobrimento unidade em cm
+ * @param diametro_arm_transv  unidade em mm
+ * @returns 
+ */
+export function calc_d(diametro_estaca: number, cobrimento: number, diametro_arm_transv: number) {
+	return 0.577 * (diametro_estaca - cobrimento - diametro_arm_transv / 10)
+}
+
+interface BwdProps {
+	diametro_estaca: number,
+	diametro_barra: number,
+	cobrimento_estaca: number
+	diametro_arm_transv: number
+}
+/**
+ * 
+ * @param props 
+ * @returns Valor do bwd em metro²
+ */
+export function calc_bwxd(props: BwdProps) {
+	const d = calc_d(props.diametro_estaca, props.cobrimento_estaca, props.diametro_arm_transv)
+	return (props.diametro_estaca - (d - (props.diametro_barra / 10) / 20)) ** 2 * Math.PI / 10000
+}
+
+interface CalcVrdProps extends Omit<BwdProps, "d"> {
+	fck: number
+	gama_c: number
+}
+export function calcVrd2(props: CalcVrdProps) {
+	const alfa_2 = calc_alfa2(props.fck)
+	const fcd = props.fck / props.gama_c
+
+	const bwxd = calc_bwxd({
+		cobrimento_estaca: props.cobrimento_estaca,
+		diametro_arm_transv: props.diametro_arm_transv,
+		diametro_barra: props.diametro_barra,
+		diametro_estaca: props.diametro_estaca
+	})
+
+	return 0.27 * alfa_2 * fcd * bwxd * 1000
+}
+
+export function calc_fctk(fck: number) {
+	return 0.21 * fck ** (2 / 3)
+}
+/**
+ * 
+ * @param bwxd bw*d em m²
+ * @param fck Fck em MPa
+ */
+export function calc_vrd_min(fck: number, bwxd: number, gama_c: number) {
+	return 0.137 * fck ** (2 / 3) * bwxd * 1000 / gama_c
+}
+
+/**
+ * 
+ * @param bwxd bw*d em m²
+ * @param fck Fck em MPa
+ */
+export function calc_v_c(bwxd: number, fck: number, gama_c: number) {
+	return 0.6 * calc_fctk(fck) * bwxd * 1000 / gama_c
+}
+/**
+ * 
+ * @param diametro_estribos mm
+ * @param d cm
+ * @param fyd MPa
+ * @returns 
+ */
+
+interface PropsCalcS {
+	diametro_estaca: number,
+	diametro_barra_long: number,
+	cobrimento_estaca: number
+	diametro_arm_transv: number
+	fck: number
+	gama_c: number
+	vsd: number
+	fyd: number
+}
+
+
+export function calc_s({ fyd, vsd, cobrimento_estaca, diametro_arm_transv, diametro_barra_long, diametro_estaca, fck, gama_c }: PropsCalcS) {
+	const diametro = diametro_estaca*100
+	const d = calc_d(diametro, cobrimento_estaca, diametro_arm_transv)
+	const bwxd = calc_bwxd({ cobrimento_estaca, diametro_arm_transv, diametro_barra: diametro_barra_long, diametro_estaca:diametro })
+	const vc = calc_v_c(bwxd, fck, gama_c)
+	const vsw = vsd - vc
+	const vrd_min = calc_vrd_min(fck, bwxd, gama_c)
+	console.log(vrd_min)
+	const asw = sel_as[diametro_arm_transv as DiametrosComerciais].as * 2
+	const fyd_cor = fyd/10
+	if(vsd <= vrd_min){
+		return {s: 20, d, bwxd, vc, vsw, vrd_min}
+	}
+	
+
+	return {s: asw / vsw * 0.9 * d * fyd_cor, d, bwxd, vc, vsw, vrd_min}
+}
+
