@@ -60,19 +60,19 @@ const SchemaDimVigaMista = z.object({
 
 export type ISchemaDimVigaMista = z.infer<typeof SchemaDimVigaMista>;
 interface CasosConectores {
-        caso_rg: "A" | "B" | "C" | "D";
-        rg: number;
-        caso_rp: "A" | "B" | "C";
-        rp: number;
-        quantidade: number;
-        qrd_conc: number;
-        acs: number;
-        fck: number;
-        ec: number;
-        fucs: number;
-        qrd_conector: number;
-        resistencia_utilizada: number;
-    }
+    caso_rg: "A" | "B" | "C" | "D";
+    rg: number;
+    caso_rp: "A" | "B" | "C";
+    rp: number;
+    quantidade: number;
+    qrd_conc: number;
+    acs: number;
+    fck: number;
+    ec: number;
+    fucs: number;
+    qrd_conector: number;
+    resistencia_utilizada: number;
+}
 type TipoInteracao = "INTERAÇÃO PARCIAL" | "INTERAÇÃO COMPLETA" | "SEM INTERACAO" | "NAO CALCULADO"
 
 interface ResultConectores {
@@ -148,7 +148,7 @@ export async function POST(request: Request) {
                 ...resultados_qrd, grau_interacao: 'NAO CALCULADO', ni: 0, ni_min: 0,
                 fucs: data.props_conectores.fucs, gama_cs: data.props_conectores.gama_cs,
                 conector: data.props_conectores.conector,
-                
+
             }
 
             const h_sobre_tw = data.secao.h / data.secao.tw
@@ -238,6 +238,8 @@ export async function POST(request: Request) {
                 result_flexao["pos_ln_comp_aco_yc"] = yc
                 result_flexao["pos_ln_conc_a"] = a
                 result_flexao["mrd"] = mrd
+                res_qrd["ni"] = ni_i
+                res_qrd["ni_min"] = Math.max(props_ni_inferiores.ni_min, props_ni_inferiores.ni_cp2crn0)
 
             } else {
                 console.log("Interação insuficiente");
