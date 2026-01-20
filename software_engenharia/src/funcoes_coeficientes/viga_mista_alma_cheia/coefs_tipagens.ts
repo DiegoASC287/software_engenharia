@@ -222,7 +222,7 @@ export const sel_tipo_construcao: Record<TipoConstrucao, number> = {
     "NAO_ESCORADA": 0.85,
 };
 
-const diametros_comerciais = [5, 6.3, 8, 10, 12.5, 16, 20, 25, 32] as const
+export const diametros_comerciais = [5, 6.3, 8, 10, 12.5, 16, 20, 25, 32] as const
 export type DiametrosComerciais = typeof diametros_comerciais[number]
 
 export const sel_as: Record<DiametrosComerciais, {as: number}> = {
