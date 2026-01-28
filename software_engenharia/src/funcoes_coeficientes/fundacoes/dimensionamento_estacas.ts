@@ -55,7 +55,7 @@ export function BuscarFatorGrupo(espacamento: number, diametro: number, tipo_est
 	const estacas_escavadas: TipoEstaca[] = [TipoEstaca.ESCAVADA, TipoEstaca.OMEGA,
 	TipoEstaca.FRANKI, TipoEstaca.HELICE_CONTINUJA, TipoEstaca.RAIZ]
 	const estacas_cravadas: TipoEstaca[] = [TipoEstaca.METALICA, TipoEstaca.PRE_MOLDADA]
-
+		
 	if (estacas_escavadas.includes(tipo_estaca)) {
 		if (espacamento / diametro > 4) {
 			return 1
