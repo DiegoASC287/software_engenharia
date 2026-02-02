@@ -119,7 +119,7 @@ export function calc_sigma_c({msd, Iii, xii}:PropsSigmaC){
     const sigma_c_min = xii > 30 ? msd*100*(xii-30)/Iii : 0
     const sigma_c_max = msd*100*xii/Iii
     const ni_c = 1/(1.5-0.5*sigma_c_min/sigma_c_max)
-    return {sigma_c_min, sigma_c_max, ni_c}
+    return {sigma_c_min, sigma_c_max, ni_c, xii, Iii}
 }
 
 export function sel_diam_pino_D(diametro_arm: DiametrosComerciais, tipo_aco: ClasseAco) {

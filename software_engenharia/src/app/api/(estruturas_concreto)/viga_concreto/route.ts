@@ -112,8 +112,9 @@ export async function POST(req: NextRequest) {
                 const solicitacao = ni_c * sigma_c_max.sigma_c_max
                 results["verficacao_fadiga_concreto"] = {
                     ...results["verficacao_fadiga_concreto"],
-                    ni_c_pos:ni_c, sigma_c_min_pos:sigma_c_min.sigma_c_min, sigma_c_max_pos:sigma_c_max.sigma_c_max, tensao_fadiga_solicitante_pos: solicitacao, fcd_fad_pos: fcd_fad,    
-                    verificacao_pos: solicitacao <= fcd_fad ? "OK" : "Falha"
+                    ni_c_pos:ni_c, sigma_c_min_pos:sigma_c_min.sigma_c_min, sigma_c_max_pos:sigma_c_max.sigma_c_max, tensao_fadiga_solicitante_pos: solicitacao,
+                    fcd_fad_pos: fcd_fad,    
+                    verificacao_pos: solicitacao <= fcd_fad ? "OK" : "Falha",
                 }
                 //gama_f nao adicionado por que é combinação frequente
 
