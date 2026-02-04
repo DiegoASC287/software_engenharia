@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
         const as_linha = body.props_aco.arranjo_arm_neg.
             reduce((as_ant, as_cur) => (as_ant + sel_as[as_cur.diametro].as * as_cur.quantidade_barras), 0)
         const { xii, Iii } = calc_props_secao_ii({ alfa_e, as, as_linha, bw, d, d_linha })
+        const { xii: xii_neg, Iii: Iii_neg } = calc_props_secao_ii({ alfa_e, as_linha: as, as: as_linha, bw, d, d_linha })
         const combs_fadiga = body.combinacoes_esforcos.filter(comb => comb.tipo === "FADIGA")
 
         //verificação à fadiga da armação
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
 
             const resultados_fadiga_aco_neg = momentos_negativos.map(combinacao_fadiga => {
                 const msd = Math.abs(combinacao_fadiga.msd)
-                return calc_sigma_s({ alfa_e, d, Iii, msd, xii })
+                return calc_sigma_s({ alfa_e, d, Iii: Iii_neg, msd, xii: xii_neg })
             })
             const maior_momento_pos = Math.max(...momentos_positivos.map(m => Math.abs(m.msd)))
             const menor_momento_pos = Math.min(...momentos_positivos.map(m => Math.abs(m.msd)))
@@ -92,14 +93,16 @@ export async function POST(req: NextRequest) {
             const fcd_fad = 0.45 * fck / (gama_c * 10) //kN/cm²
 
             if (maior_momento_neg - menor_momento_neg > 0) {
-                const sigma_c_min = calc_sigma_c({msd: menor_momento_neg, Iii, xii})
-                const sigma_c_max = calc_sigma_c({msd: maior_momento_neg, Iii, xii})
+                const sigma_c_min = calc_sigma_c({msd: menor_momento_neg, Iii: Iii_neg, xii: xii_neg})
+                const sigma_c_max = calc_sigma_c({msd: maior_momento_neg, Iii: Iii_neg, xii: xii_neg})
                 const ni_c = Math.max(sigma_c_min.ni_c, sigma_c_max.ni_c)
                 
                 const solicitacao = ni_c * sigma_c_max.sigma_c_max
                 results["verficacao_fadiga_concreto"] = {
                     ...results["verficacao_fadiga_concreto"],
-                    ni_c_neg:ni_c, sigma_c_min_neg:sigma_c_min.sigma_c_min, sigma_c_max_neg:sigma_c_max.sigma_c_max, tensao_fadiga_solicitante_neg: solicitacao, fcd_fad_neg: fcd_fad,    
+                    ni_c_neg:ni_c, sigma_c_min_neg:sigma_c_min.sigma_c_min, 
+                    sigma_c_max_neg:sigma_c_max.sigma_c_max, tensao_fadiga_solicitante_neg: solicitacao, fcd_fad_neg: fcd_fad,    
+                    xii_neg,
                     verificacao_neg: solicitacao <= fcd_fad ? "OK" : "Falha"
                 }
                 //gama_f nao adicionado por que é combinação frequente
@@ -113,7 +116,8 @@ export async function POST(req: NextRequest) {
                 results["verficacao_fadiga_concreto"] = {
                     ...results["verficacao_fadiga_concreto"],
                     ni_c_pos:ni_c, sigma_c_min_pos:sigma_c_min.sigma_c_min, sigma_c_max_pos:sigma_c_max.sigma_c_max, tensao_fadiga_solicitante_pos: solicitacao,
-                    fcd_fad_pos: fcd_fad,    
+                    fcd_fad_pos: fcd_fad,  
+                    xii_pos: xii,  
                     verificacao_pos: solicitacao <= fcd_fad ? "OK" : "Falha",
                 }
                 //gama_f nao adicionado por que é combinação frequente
@@ -155,7 +159,7 @@ export async function POST(req: NextRequest) {
                 as_linha_nec = fc * bw / fyd * y
             }
 
-            return { k, as_nec, as_linha_nec, y, d, fyd, bw, fc, xii, Iii }
+            return { k, as_nec, as_linha_nec, y, d, fyd, bw, fc }
         })
         return NextResponse.json({ results, resultados_as });
     } else {
