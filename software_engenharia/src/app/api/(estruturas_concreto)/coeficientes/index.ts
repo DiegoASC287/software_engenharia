@@ -49,10 +49,11 @@ export function props_steel(classe_aco: ClasseAco) {
     return sel_props_aco[classe_aco]
 }
 
-export const diametros_comerciais = ["5", "6.3", "8", "10", "12.5", "16", "20", "25", "32"] as const
+export const diametros_comerciais = ["4.2","5", "6.3", "8", "10", "12.5", "16", "20", "25", "32"] as const
 export type DiametrosComerciais = typeof diametros_comerciais[number]
 
 export const sel_as: Record<DiametrosComerciais, { as: number }> = {
+    "4.2": { as: 0.14 },
     "5": { as: 0.196 },
     "6.3": { as: 0.31 },
     "8": { as: 0.5 },
